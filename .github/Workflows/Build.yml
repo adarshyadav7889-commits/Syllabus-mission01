@@ -12,6 +12,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -22,17 +23,17 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
 
       - name: Create Android project
         run: |
           mkdir -p app/src/main/java/com/adarsh/syllabusmission
-          cp App.kt ChapterData.kt Database.kt Logic.kt LogicTest.kt MainActivity.kt Screens.kt Theme.kt app/src/main/java/com/adarsh/syllabusmission/
-          cp AndroidManifest.xml app/src/main/AndroidManifest.xml
+          mkdir -p app/src/main/res/values
+          cp App.kt app/src/main/java/com/adarsh/syllabusmission/App.kt
 
-      - name: Generate Gradle configuration
-        run: |
           cat > settings.gradle.kts <<'EOF'
           pluginManagement {
               repositories {
@@ -79,7 +80,7 @@ jobs:
 
               defaultConfig {
                   applicationId = "com.adarsh.syllabusmission"
-                  minSdk = 23
+                  minSdk = 26
                   targetSdk = 34
                   versionCode = 1
                   versionName = "1.0"
@@ -104,25 +105,59 @@ jobs:
           }
 
           dependencies {
-              implementation(platform("androidx.compose:compose-bom:2024.06.00"))
+              val composeBom = platform("androidx.compose:compose-bom:2024.06.00")
+              implementation(composeBom)
+              androidTestImplementation(composeBom)
+
               implementation("androidx.activity:activity-compose:1.9.0")
               implementation("androidx.compose.ui:ui")
               implementation("androidx.compose.ui:ui-tooling-preview")
               implementation("androidx.compose.material3:material3")
+              implementation("androidx.compose.material:material-icons-extended")
+              implementation("androidx.navigation:navigation-compose:2.7.7")
+
               implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.3")
               implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.3")
               implementation("androidx.room:room-runtime:2.6.1")
               implementation("androidx.room:room-ktx:2.6.1")
               kapt("androidx.room:room-compiler:2.6.1")
+              implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+
               debugImplementation("androidx.compose.ui:ui-tooling")
           }
           EOF
 
+          cat > app/src/main/res/values/themes.xml <<'EOF'
+          <resources>
+              <style name="Theme.SyllabusMission"
+                  parent="android:style/Theme.Material.Light.NoActionBar">
+                  <item name="android:fontFamily">sans</item>
+                  <item name="android:colorAccent">#6750A4</item>
+              </style>
+          </resources>
+          EOF
+
+          cat > app/src/main/AndroidManifest.xml <<'EOF'
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <application
+                  android:allowBackup="true"
+                  android:label="Syllabus Mission"
+                  android:supportsRtl="true"
+                  android:theme="@style/Theme.SyllabusMission">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          EOF
+
       - name: Build debug APK
-        run: |
-          gradle wrapper --gradle-version 8.7
-          chmod +x gradlew
-          ./gradlew assembleDebug --stacktrace
+        run: gradle --no-daemon :app:assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
